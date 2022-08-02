@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
+import { useMachine, triviaMachine, ACTIONS, levelStates } from '../state/triviaMachine'
 
 export const Trivia = () => {
 
@@ -8,18 +9,28 @@ export const Trivia = () => {
 	const [questionCount, setQuestionCount] = useState(0)
 	const [correctCount, setCorrectCount] = useState(0)
 	const [wrongCount, setWrongCount] = useState(0)
+	const [state, send] = useMachine(triviaMachine)
 
+	console.log('state.context.totalQuestionCount', state.context.totalQuestionCount)
 
 	const fetchQuestions = async () => {
-		const url = `https://opentdb.com/api.php?amount=20&category=18&difficulty=easy`
+		const url = `https://opentdb.com/api.php?amount=20&category=18&difficulty=${state.name}`
 		const res = await fetch(url)
 		const questions = await res.json()
 		setQuestions(questions.results)
 	};
 
+	const resetCounts = () => {
+		setCorrectCount(0)
+		setWrongCount(0)
+	}
+
 	useEffect(() => {
-		fetchQuestions()
-	}, [])
+		if (levelStates.includes(state.name)) {
+			resetCounts()
+			fetchQuestions()
+		}
+	}, [state.name])
 
 	const decodeString = (string) => {
 		const parser = new DOMParser();
@@ -46,13 +57,19 @@ export const Trivia = () => {
 		setQuestionCount(questionCount => questionCount + 1)
 	}
 
+	useEffect(() => {
+		if (correctCount === 3 || wrongCount === 3) {
+			send(ACTIONS.levelChange({correct: correctCount, wrong: wrongCount, totalQuestionCount: questionCount}))
+		}
+	}, [correctCount, wrongCount])
+
 	const onSelectValue = e => {
 		setResponse(e.target.value)
 	}
 	return (
 		<Game>	
 			<Stats>
-				<Stat fontColor="lightblue">Level: <span> Easy</span></Stat>
+				<Stat fontColor="lightblue">Level: <span>{ state.name }</span></Stat>
 				<div></div>
 				<Stat fontColor="green">Won: <span> { correctCount}</span></Stat>
 				<div></div>
@@ -66,7 +83,7 @@ export const Trivia = () => {
 					<form onSubmit={ judgeResponse }>
 						<Answers>
 							{possibleResponses?.map((r, i) => (
-								<label>
+								<label key={i}>
 									<input 
 										type='radio' 
 										value={r} 
